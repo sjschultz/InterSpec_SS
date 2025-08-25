@@ -1,0 +1,22 @@
+name: Build InterSpec (Windows, batch CLI)
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure MSVC env
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: CMake configure (fetch deps automatically)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DInterSpec_FETCH_DEPENDENCIES=ON
+      - name: Build
+        run: cmake --build build --config Release --target InterSpec
+      - name: Package
+        run: |
+          mkdir out
+          copy build\bin\InterSpec.exe out\
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InterSpec-batch-windows
+          path: out
