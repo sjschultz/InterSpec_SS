@@ -1,20 +1,47 @@
-name: Build InterSpec (Windows, batch CLI)
-on: workflow_dispatch
+name: Build InterSpec (Windows, vcpkg)
+
+on:
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Configure MSVC env
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Enable MSVC (x64)
         uses: ilammy/msvc-dev-cmd@v1
-      - name: CMake configure (fetch deps automatically)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DInterSpec_FETCH_DEPENDENCIES=ON
+
+      # Install Wt and friends via vcpkg (avoids the Wt patch step)
+      - name: Setup vcpkg + install libs
+        uses: microsoft/vcpkg-action@v1
+        with:
+          triplet: x64-windows
+          # vcpkg will build/cache the packages automatically:
+          runVcpkgInstall: true
+          packages: >
+            wt[ssl,websocket,sql-sqlite3]:x64-windows
+            openssl:x64-windows
+
+      - name: Configure (CMake, use vcpkg toolchain)
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DInterSpec_FETCH_DEPENDENCIES=OFF
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}\scripts\buildsystems\vcpkg.cmake"
+
       - name: Build
         run: cmake --build build --config Release --target InterSpec
-      - name: Package
+
+      - name: Package artifact
         run: |
-          mkdir out
-          copy build\bin\InterSpec.exe out\
+          if not exist out mkdir out
+          xcopy /y /e build\bin out\bin\
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
